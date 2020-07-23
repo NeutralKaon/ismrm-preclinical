@@ -1,0 +1,252 @@
+# Linear Mixed Models
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(xtable)
+library(lme4)
+library(lmerTest)
+```
+
+
+This is a slightly left-field extension chapter that discusses the role of linear mixed models as an extension to ANOVA for analysing longitudinal data. 
+
+## Background 
+All ANOVAs discussed to date form _linear models_ --- as explicitly highlighted by R in the process of calling a linear model in the form of `aov( Y ~ X1 + X2 + ...)`{.R}, which is 'syntactic sugar' for `aov(lm(Y ~ X1 + X2 + ...))`{.R}. The difference between the two largely are philosophical: with a change of naming and the interpetation of the model, we can make the same conclusions in a slightly different guise. 
+
+In linear regression, we change the language of the problem to be solved. Traditionally, and in a slightly overly-formal way, given a (random) sample of points $(Y_i,X_{i1},\cdots,X_{ip})$ where $i=1\cdots n$ represent each individual data point and $p$ the total number of independent variables, linear models aim to describe the dependent variable $Y$ as
+
+$$
+Y_i = \beta_0 + \beta_1 \phi_1 ( X_{i1}) + \cdots + \beta_p \phi_p(X_{ip}) + \epsilon_i\qquad i=1,\ldots,n;
+$$
+where the $\beta$'s are unknown coefficients to be determined, and the $\phi$'s are (known) potentially non-linear functions of $X$. Linear models are therefore called linear as they are _linear in their parameters_, not (necessarily!) the independent variables. 
+
+The most common way to actually try to find the value of each $\beta$ is through ordinary least squares -- minimising the sum of the squares of differences between what the model predicts, and the data actually observed.  Note that there are many different interpretations ultimately of the results. If $X_{1i}$￼is, say, a person's blood pressure at age 65, and $Y_{i}$￼ their age at death, and our goal is to predict a person's age of death on the basis of their blood pressure -- then, unsurprisingly, this is known as a prediction problem. If the value of $\beta$ for that predictor is not significantly different from zero, well, we conclude that blood pressure does not affect age at death. 
+
+If, on the other hand, $Y_i$  is a discrete, binary number that denotes whether they lived or died, then this is a form of a classification problem -- and a different, but related mathematical framework needs to be used, often with nonlinear functions that transform the space of $[0,1]$ to $(-\infty,\infty)$. 
+
+If, however, we just want to find the form of the equation linking them -- particularly values of the parameters in the equation -- and don’t really care about the $X$'s and $Y$'s beyond using them to determine the $\beta$'s￼, then this is a curve fitting problem.
+
+Why does this matter? Well, ANOVA and linear regression are equivalent when the two models test against the same hypotheses and use an identical encoding, that is, an understanding of what the interpretation of the $X$'s is. The models differ in their basic aim: ANOVA is mostly concerned to present differences between categories' means in the data while linear regression is mostly concern to estimate a sample mean response and its associated variance. So, one can describe ANOVA as a regression with dummy variables. We can easily see that this is the case in the simple regression with categorical variables -- typically mathematically encoded as either an integer determining if a subject is part of a given group, or not. 
+
+## Mathematical detail
+
+Suppose for the sake of argument that your data-set consists of a set $(x_i,y_i)$ for $i=1,\ldots,n$ and you want to look at the dependence of $y$ on $x$ -- i.e. let's consider a simpler subset of the above. Suppose further you find the values $\hat\alpha$ and $\hat\beta$ of $\alpha$ and $\beta$ that minimize the residual sum of squares
+
+$$
+\sum_{i=1}^n (y_i - (\alpha+\beta x_i))^2.
+$$
+Then you take $\hat y = \hat\alpha+ \hat\beta x$ to be the predicted $y$-value for any (not necessarily already observed) $x$-value.  That's linear regression. 
+Now consider decomposing the total sum of squares
+$$
+\sum_{i=1}^n (y_i - \bar y)^2 \qquad\text{where }\bar y = \frac{y_1+\cdots+y_n}{n}
+$$
+with $n-1$ degrees of freedom, into "explained" and "unexplained" parts:
+$$
+\underbrace{\sum_{i=1}^n ((\hat\alpha+\hat\beta x_i) - \bar y)^2}_{\text{explained}}\  +\  \underbrace{\sum_{i=1}^n (y_i - (\hat\alpha+\hat\beta x_i))^2}_{\text{unexplained}}.
+$$
+
+with $1$ and $n-2$ degrees of freedom, respectively.  That's analysis of variance, and one then considers things like F-statistics, as allued to earlier:
+
+$$
+F = \frac{\sum_{i=1}^n ((\hat\alpha+\hat\beta x_i) - \bar y)^2/1}{\sum_{i=1}^n (y_i - (\hat\alpha+\hat\beta x_i))^2/(n-2)}.
+$$
+_This_ F-statistic tests the null hypothesis $\beta=0$. It's _exactly_ the same as before. 
+
+One often first encounters the term "analysis of variance" when the predictor is categorical, so that you're fitting the model
+$$
+y = \alpha + \beta_i
+$$
+where $i$ identifies which category is the value of the predictor.  If there are $k$ categories, you'd get $k-1$ degrees of freedom in the numerator in the F-statistic, and usually $n-k$ degrees of freedom in the denominator.  But the distinction between regression and analysis of variance is still the same for this kind of model. And that's, ultimately, why `R`{.R}'s help explicitly states that `aov`{.R} _fits an analysis of variance model by a call to `lm` for each stratum_. 
+
+## Mixed models -- a mathematical introduction
+
+With that large introduction aside, linear mixed models are an extension to the above. Rather than having one error term, $\epsilon_i$ which overall is normally distributed with zero mean and some (unknown) variance $\sigma^2$, we relax this assumption. The _mixed_ bit is that instead of just including fixed effects -- corresponding to the fixed, common $\beta$'s above, we include additional random-effect terms, which are often appropriate for representing clustered, and therefore dependent, data. Examples include when data are collected hierarchically, when observations are taken on related individuals (such as siblings), or when data are gathered over time on the same individuals. The latter is particularly commonly performed in longitudinal experiments.
+
+Like most areas of statistics, mixed models are a large and complex subject, and this set of notes is not intended to be definitive. The full mathematical expression for a general linear mixed model is mildly hairy, but the basic idea behind a random effect is that instead of having _one true $\beta$_ it is the case that $\beta$ is itself a random variable. That is, say, $\beta_1\sim N(\mu_{\beta_1}, \sigma_\beta_1)$. Were we to write this out in full, in the most general form, we'd end up with a moderately complicated set of equations:
+
+$$
+y_{ij} = \overbrace{\beta_1 x_{1ij} + \cdots \beta_p x_{pij} }^\text{fixed effects} + \underbrace{b_{i1}z_{1ij} + \cdots + b_{iq} z_{qij}} _ \text{random effects} + \epsilon_ij
+$$
+
+$$
+b_{ik} \sim N(0,\psi_{k}^{2}), \quad \text{Cov}(b_k,b_{k'}) = \psi_{kk'}
+$$
+
+$$
+\epsilon_{ij} \sim N(0,\sigma^2 \lambda_{ijj'}),\quad \text{Cov}(\epsilon_{ij},b_{k'}) = \psi_{kk'}
+$$
+
+where (get ready for it!)
+
+* $y_{ij}$ is the response variable for the $j$th observation, out of $n_i$ in total, within the $i$th group of $M$ groups in total;
+* $\beta_1,\ldots\,\beta_p$ are the fixed-effect coefficients; identical across all groups; 
+* $x_{1ij},\ldots,x_{pij}$ are the regressor variables for the fixed-effects for observation $j$ in group $i$; 
+* $b_{i1},\ldots,b_{iq}$ are the random-effect coefficients for group $i$. These are all assumed to be multivariately normally distributed; for example, representing individual variability but drawn from some underlying population. Moreover, they are thought of samples as random variables -- not as parameters to find -- and are therefore in some sense similar to the errors, $\epsilon_{ij}$. 
+* $z_{1ij},\ldots,z_{qij}$ are the random effect regressor variables -- for example, subject ID. 
+* The $\psi^{2}_{k}$'s are the variances and $\psi_{kk'}$ covariances among the random effects, which are assumed to be constant across the groups. Similarly, $\sigma^2\lambda_{ijj'}$ represent covariances _between_ errors in group $i$. What form this exactly takes can be a bit hard to pin down, but if each observation is determined separately across groups, and assumed to have constant variance in error, then $\lambda_{ijj}=\sigma^2$  if $j=j'$ and $0$ otherwise. This model often is not terribly appropriate if observations are in a "group" across time, as the observations are likely to have some degree of autocorrelation. Nevertheless, it is often far easier, and the error performance of the model can be checked after construction. 
+
+
+## An example 
+
+Practically, what this means is that given effects can be stratified by further sub-groups that may be 'lumped' together in a conventional analysis. The distinctions between the different random effects and group effects can be very important: the difference between within-groups and between-groups predictors can be totally anti-correlated. The most famous example of this is Simpson's "paradox", in which ignoring this grouping variable can lead to _totally_ different conclusions. 
+
+Here's an example. Let's generate a variety of $x$ and $y$ variables that have exactly one fixed effect,  looking at the relationship between marker X and marker Y. 
+
+
+```{r, fig.cap="A brief example of Simpson's paradox: the trend for each dataset is different individually to that as a whole"} 
+set.seed(0)
+#SIMPSON'S PARADOX:
+
+par(mfrow=c(1,2))
+
+plot(1, xlim = c(0,120), ylim = c(0,1200), type='n',
+     xlab = "[Marker X]", ylab ="[Marker Y]",
+     main="Individual Studies")
+
+plot.new();
+x <- seq(0, 30, 0.3)
+d <- 400 - 5 * x + rnorm(x, 0, 150)
+points(d ~ x, pch = 20, cex=0.8, col='green4')
+abline(lm(d ~ x), col='green4', lwd=2)
+cor_d <- cor(d,x)
+
+x <- seq(30, 60, 0.3)
+c <- 700 - 5 * x + rnorm(x, 0, 150)
+points(c ~ x, pch = 20, cex=0.8, col='darkmagenta')
+abline(lm(c ~ x), col='darkmagenta', lwd=2)
+cor_c <- cor(c,x)
+
+x <- seq(60, 90, 0.3)
+b <- 1000 - 5 * x + rnorm(x, 0, 150)
+points(b ~ x, pch=20, cex=0.8, col='gray8')
+abline(lm(b ~ x), col='gray8', lwd=2)
+cor_b <- cor(b,x)
+
+x <- seq(90, 120, 0.3)
+a <- 1300 - 5 * x + rnorm(x, 0, 150)
+points(a ~ x, pch=20, cex=0.8, col='darkorange')
+abline(lm(a ~ x), col='darkorange', lwd=2)
+cor_a <- cor(a,x)
+
+x <- c(seq(0, 30, 0.3),seq(10, 40, 0.3),
+       seq(20, 50, 0.3),seq(30, 60, 0.3))
+y <- c(d,c,b,a)
+
+plot(y ~ x, ylim=c(0,1200),col='gray20', pch=19, cex=0.5,
+     xlab = "[Marker X]", ylab ="[Marker Y]",
+     main = "Summed-Analysis")
+abline(lm(y ~ x), col='gray20',lwd=2)
+
+groups <- length(x)/4
+simpson <- data.frame(x, y, Groups = c(rep("D",groups),
+                                       rep("C",groups), rep("B",groups), rep("A",groups)),
+                      y_intercepts = c(rep(400, groups), rep(700, groups), 
+                                       rep(1000,groups), rep(1300,groups)))
+knitr::kable(simpson[1:5,])
+
+```
+
+These data have a twist: they're coloured by a grouping variable, and crucially the intercept for that random variable is correlated with $x$. In a study context, this may well arise due to, for example, learning as some lurking variable. Rather irritatingly, the overall trend when data are summed therefore appears to be _completely opposite_ to that in each individual group. There's something else going on here, and the best way to quantify it is through mixed modelling. If we perform a conventional ANOVA on the linear model, we'd just call `summary(lm(y ~ x, simpson))`{.R}; using the `lm`{.R} syntax directly:
+
+```{r, echo=T}
+OLS <- lm(y ~ x, simpson)
+summary(lm(y ~ x, simpson))
+```
+
+we see that the intercept and the coefficient for $x$ are both highly different from zero, and the coefficient of $x$ is positive -- as you might well expect. But, calling the same thing through a mixed model (with the `lme4`{.R} and `lmerTest`{.R} packages) yields a rather different answer. Here, we're saying that the `Groups`{.R} is our random effect, allowed to have a different intercept per group, but a common mean. If we wanted to relax _that_ assumption, we'd write `(Groups|Groups)`{.R}, but the resulting model would be very underdetermined and (in this case) not very informative. The use of the `lmerTest`{.R} is a convenience wrapper to provide $p$-values from mixed models; we can also call `anova`{.R} directly. 
+
+
+```{r lme4 lmerTest,echo =T}
+MEM <- lmer(y ~ x + (1|Groups), simpson, REML=F)
+summary(MEM)
+anova(MEM)
+```
+
+Gadzooks! The value of the estimate for $x$ has changed _completely_ -- it's gone from being positive to negative -- and it is also significantly different from zero. So, with two different methods to compare the same thing, which explains the data better? Let's look at the [https://en.wikipedia.org/wiki/Akaike_information_criterion](Akaike information criterion), a measure that takes into account how well different models describe data, taking into account the fact that they may have different number of parameters -- and the more parameters a model has, the better we expect it to perform. (There is an old saying originally by von Neumann: give me four parameters, and I'll fit you an elephant; give me five, and I'll make him wiggle his trunk. It turns out to be [https://publications.mpi-cbg.de/Mayer_2010_4314.pdf](true).) The AIC basically takes a measure of how well the mdoel fits the data, and a term that penalises it for parameters. Lower numbers are "better". Although there are certain subtleties and down-sides to using AICs for model selection, it's a good place to start answering the question: which approach quantitatively fits the data better? 
+
+```{r, echo=T}
+#The random effect model is better suited than the OLS:
+AIC(OLS,MEM)
+
+coef(OLS); coef(MEM) #And the answers they give are totally different!
+```
+
+
+
+As mentioned above, this changes because of correlation between the value of the random effect and $x$. Here, this correlation is specified in advance, but it needn't be: observational data is full of such discoveries. For example: 
+
+* Smokers who have higher levels of vitamin A in their diet (or who have higher levels in their blood) have lower risk of developing lung cancer, in a dose-dependent way.
+* Two large randomised trials (CARET and ATBC) showed that giving high-dose vitamin to smokers increased their cancer risk
+* The favorable relationship between vitamin A in the blood and cancer risk was still present within groups in the cancer trials [https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4971935/]((example link)).
+
+So, the aggregate relationship goes in the opposite direction to the within-group relationship, and it's the aggregate relationship that (appears to be) causal.
+
+
+
+If that correlation isn't there, mixed modelling can _still_ help us; consider the situation below, where we don't have the correlation -- but ignoring the grouping variable would result in greater variability in the data. 
+
+
+```{r}
+## VERSUS UNCORRELATED RANDOM EFFECTS:
+
+par(mfrow=c(1,2))
+
+plot(1, xlim=c(0,62), ylim = c(0,1500), type='n',
+     xlab = "[Marker X]", ylab ="[Marker Y]",
+     main="Random Effects")
+
+
+x <- seq(0, 60, 0.3)
+d <- 400 - 7 * x + rnorm(x, 0, 150)
+points(d ~ x, pch = 19, cex=0.6, col='green4')
+abline(lm(d ~ x), col='green4', lwd=2)
+cor_d <- cor(d,x)
+
+c <- 700 - 7 * x + rnorm(x, 0, 150)
+points(c ~ x, pch = 19, cex=0.6, col='darkmagenta')
+abline(lm(c ~ x), col='darkmagenta',lwd=2)
+cor_c <- cor(c,x)
+
+b <- 1000 - 7 * x + rnorm(x, 0, 150)
+points(b ~ x, pch=19, cex=0.6, col='gray20')
+abline(lm(b ~ x), col='gray20', lwd=2)
+cor_b <- cor(b,x)
+
+a <- 1300 - 7 * x + rnorm(x, 0, 150)
+points(a ~ x, pch=19, cex=0.6, col='darkorange')
+abline(lm(a ~ x), col='darkorange', lwd=2)
+cor_a <- cor(a,x)
+
+x <- c(rep(seq(0, 60, 0.3),4))
+y <- c(d,c,b,a)
+
+plot(y ~ x, col='gray20', pch=20, cex=0.5,
+     xlab = "[Marker X]", ylab ="[Marker Y]",
+     main = "Increased Dispersion")
+abline(lm(y ~ x), col='black', lwd=2)
+
+groups <- length(x)/4
+randeff <- data.frame(x, y, Groups = c(rep("D",groups),
+                                       rep("C",groups), rep("B",groups), rep("A",groups)),
+                      y_intercepts = c(rep(400, groups), rep(700, groups), 
+                                       rep(1000,groups), rep(1300,groups)))
+```
+
+Performing the same trick with mixed models is straightforward:  
+
+```{r lme4 lmerTest, echo=T}
+OLS <- lm(y ~ x, randeff)
+MEM <- lmer(y ~ x + (1|Groups), randeff, REML = F)
+AIC(OLS, MEM)
+```
+
+We see this time there is also evidence that the mixed model outperforms ordinary least squares. But here, the conclusions we draw are the same: 
+
+
+```{r lme4 lmerTest, echo=T} 
+summary(MEM)
+summary(OLS)
+```
+
+Here, the benefit of mixed modelling is in the test statistics. The value of $t$ we have, determined via Satterthwaite's method, is substantially larger in magnitude for the mixed model compared to the ordinary least squares conventional one. In other words, we've effectively increased power in the experiment by correctly accounting for variability. 
