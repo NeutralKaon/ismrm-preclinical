@@ -16,6 +16,7 @@ output:
       family: sans
       size: 1
 documentclass: book
+always_allow_html: true
 bibliography: [book.bib, packages.bib, MyLibrary.bib,refs.bib]
 biblio-style: apalike
 link-citations: yes

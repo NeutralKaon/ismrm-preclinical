@@ -7,3 +7,6 @@ data.table
 xtable
 kableExtra
 gganimate
+Matrix
+lme4
+lmerTest

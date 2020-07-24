@@ -1,0 +1,12 @@
+base
+dplyr
+ggplot2
+data.table
+xtable
+magrittr
+ggpubr
+kableExtra
+gganimate
+Matrix
+lme4
+lmerTest

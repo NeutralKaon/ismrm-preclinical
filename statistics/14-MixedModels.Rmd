@@ -7,9 +7,9 @@ library(xtable)
 library(lme4)
 library(lmerTest)
 ```
+  
 
-
-This is a slightly left-field extension chapter that discusses the role of linear mixed models as an extension to ANOVA for analysing longitudinal data. 
+This is a slightly left-field extension chapter (not written by the original authors) that discusses the role of linear mixed models as an extension to ANOVA for analysing longitudinal data. 
 
 ## Background 
 All ANOVAs discussed to date form _linear models_ --- as explicitly highlighted by R in the process of calling a linear model in the form of `aov( Y ~ X1 + X2 + ...)`{.R}, which is 'syntactic sugar' for `aov(lm(Y ~ X1 + X2 + ...))`{.R}. The difference between the two largely are philosophical: with a change of naming and the interpetation of the model, we can make the same conclusions in a slightly different guise. 
@@ -63,7 +63,7 @@ where $i$ identifies which category is the value of the predictor.  If there are
 
 With that large introduction aside, linear mixed models are an extension to the above. Rather than having one error term, $\epsilon_i$ which overall is normally distributed with zero mean and some (unknown) variance $\sigma^2$, we relax this assumption. The _mixed_ bit is that instead of just including fixed effects -- corresponding to the fixed, common $\beta$'s above, we include additional random-effect terms, which are often appropriate for representing clustered, and therefore dependent, data. Examples include when data are collected hierarchically, when observations are taken on related individuals (such as siblings), or when data are gathered over time on the same individuals. The latter is particularly commonly performed in longitudinal experiments.
 
-Like most areas of statistics, mixed models are a large and complex subject, and this set of notes is not intended to be definitive. The full mathematical expression for a general linear mixed model is mildly hairy, but the basic idea behind a random effect is that instead of having _one true $\beta$_ it is the case that $\beta$ is itself a random variable. That is, say, $\beta_1\sim N(\mu_{\beta_1}, \sigma_\beta_1)$. Were we to write this out in full, in the most general form, we'd end up with a moderately complicated set of equations:
+Like most areas of statistics, mixed models are a large and complex subject, and this set of notes is not intended to be definitive. The full mathematical expression for a general linear mixed model is mildly hairy, but the basic idea behind a random effect is that instead of having _one true $\beta$_ it is the case that $\beta$ is itself a random variable. That is, say, $\beta_{1} \sim N(\mu_{\beta_{1}}, \sigma_{\beta_{1}})$. Were we to write this out in full, in the most general form, we'd end up with a moderately complicated set of equations:
 
 $$
 y_{ij} = \overbrace{\beta_1 x_{1ij} + \cdots \beta_p x_{pij} }^\text{fixed effects} + \underbrace{b_{i1}z_{1ij} + \cdots + b_{iq} z_{qij}} _ \text{random effects} + \epsilon_ij
@@ -97,14 +97,14 @@ Here's an example. Let's generate a variety of $x$ and $y$ variables that have e
 ```{r, fig.cap="A brief example of Simpson's paradox: the trend for each dataset is different individually to that as a whole"} 
 set.seed(0)
 #SIMPSON'S PARADOX:
-
+plot.new()
 par(mfrow=c(1,2))
 
 plot(1, xlim = c(0,120), ylim = c(0,1200), type='n',
      xlab = "[Marker X]", ylab ="[Marker Y]",
      main="Individual Studies")
 
-plot.new();
+
 x <- seq(0, 30, 0.3)
 d <- 400 - 5 * x + rnorm(x, 0, 150)
 points(d ~ x, pch = 20, cex=0.8, col='green4')
@@ -143,8 +143,6 @@ simpson <- data.frame(x, y, Groups = c(rep("D",groups),
                                        rep("C",groups), rep("B",groups), rep("A",groups)),
                       y_intercepts = c(rep(400, groups), rep(700, groups), 
                                        rep(1000,groups), rep(1300,groups)))
-knitr::kable(simpson[1:5,])
-
 ```
 
 These data have a twist: they're coloured by a grouping variable, and crucially the intercept for that random variable is correlated with $x$. In a study context, this may well arise due to, for example, learning as some lurking variable. Rather irritatingly, the overall trend when data are summed therefore appears to be _completely opposite_ to that in each individual group. There's something else going on here, and the best way to quantify it is through mixed modelling. If we perform a conventional ANOVA on the linear model, we'd just call `summary(lm(y ~ x, simpson))`{.R}; using the `lm`{.R} syntax directly:
@@ -157,13 +155,13 @@ summary(lm(y ~ x, simpson))
 we see that the intercept and the coefficient for $x$ are both highly different from zero, and the coefficient of $x$ is positive -- as you might well expect. But, calling the same thing through a mixed model (with the `lme4`{.R} and `lmerTest`{.R} packages) yields a rather different answer. Here, we're saying that the `Groups`{.R} is our random effect, allowed to have a different intercept per group, but a common mean. If we wanted to relax _that_ assumption, we'd write `(Groups|Groups)`{.R}, but the resulting model would be very underdetermined and (in this case) not very informative. The use of the `lmerTest`{.R} is a convenience wrapper to provide $p$-values from mixed models; we can also call `anova`{.R} directly. 
 
 
-```{r lme4 lmerTest,echo =T}
+```{r, echo =T}
 MEM <- lmer(y ~ x + (1|Groups), simpson, REML=F)
 summary(MEM)
 anova(MEM)
 ```
 
-Gadzooks! The value of the estimate for $x$ has changed _completely_ -- it's gone from being positive to negative -- and it is also significantly different from zero. So, with two different methods to compare the same thing, which explains the data better? Let's look at the [https://en.wikipedia.org/wiki/Akaike_information_criterion](Akaike information criterion), a measure that takes into account how well different models describe data, taking into account the fact that they may have different number of parameters -- and the more parameters a model has, the better we expect it to perform. (There is an old saying originally by von Neumann: give me four parameters, and I'll fit you an elephant; give me five, and I'll make him wiggle his trunk. It turns out to be [https://publications.mpi-cbg.de/Mayer_2010_4314.pdf](true).) The AIC basically takes a measure of how well the mdoel fits the data, and a term that penalises it for parameters. Lower numbers are "better". Although there are certain subtleties and down-sides to using AICs for model selection, it's a good place to start answering the question: which approach quantitatively fits the data better? 
+Gadzooks! The value of the estimate for $x$ has changed _completely_ -- it's gone from being positive to negative -- and it is also significantly different from zero. So, with two different methods to compare the same thing, which explains the data better? Let's look at the [Akaike information criterion](https://en.wikipedia.org/wiki/Akaike_information_criterion), a measure that takes into account how well different models describe data, taking into account the fact that they may have different number of parameters -- and the more parameters a model has, the better we expect it to perform. (There is an old saying originally by von Neumann: give me four parameters, and I'll fit you an elephant; give me five, and I'll make him wiggle his trunk. It turns out to be [true](https://publications.mpi-cbg.de/Mayer_2010_4314.pdf).) The AIC basically takes a measure of how well the mdoel fits the data, and a term that penalises it for parameters. Lower numbers are "better". Although there are certain subtleties and down-sides to using AICs for model selection, it's a good place to start answering the question: which approach quantitatively fits the data better? 
 
 ```{r, echo=T}
 #The random effect model is better suited than the OLS:
@@ -178,7 +176,7 @@ As mentioned above, this changes because of correlation between the value of the
 
 * Smokers who have higher levels of vitamin A in their diet (or who have higher levels in their blood) have lower risk of developing lung cancer, in a dose-dependent way.
 * Two large randomised trials (CARET and ATBC) showed that giving high-dose vitamin to smokers increased their cancer risk
-* The favorable relationship between vitamin A in the blood and cancer risk was still present within groups in the cancer trials [https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4971935/]((example link)).
+* The favorable relationship between vitamin A in the blood and cancer risk was still present within groups in the cancer trials ([example link](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4971935/)).
 
 So, the aggregate relationship goes in the opposite direction to the within-group relationship, and it's the aggregate relationship that (appears to be) causal.
 
@@ -235,7 +233,7 @@ randeff <- data.frame(x, y, Groups = c(rep("D",groups),
 
 Performing the same trick with mixed models is straightforward:  
 
-```{r lme4 lmerTest, echo=T}
+```{r, echo=T}
 OLS <- lm(y ~ x, randeff)
 MEM <- lmer(y ~ x + (1|Groups), randeff, REML = F)
 AIC(OLS, MEM)
@@ -250,3 +248,5 @@ summary(OLS)
 ```
 
 Here, the benefit of mixed modelling is in the test statistics. The value of $t$ we have, determined via Satterthwaite's method, is substantially larger in magnitude for the mixed model compared to the ordinary least squares conventional one. In other words, we've effectively increased power in the experiment by correctly accounting for variability. 
+
+# References

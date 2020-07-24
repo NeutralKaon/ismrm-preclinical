@@ -2,6 +2,9 @@ book_filename: "statistics"
 repo: https://github.com/CrumpLab/statistics
 edit: https://github.com/CrumpLab/statistics/%s
 output_dir: "docs"
+always_allow_html: true
 language:
   ui:
     chapter_name: "Chapter "
+
+delete_merged_file: true
