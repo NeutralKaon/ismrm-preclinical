@@ -3,8 +3,6 @@ Materials to supplement my 2020 ISMRM educational talk (Clinical vs. Preclinical
 
 This is IN PROGRESS (slightly behind schedule -- sorry!) and will be updated soon. 
 
-## Overview 
-
 Experimental design is absolutely key to the accurate interpretation of preclinical MR experiments. This is a vast area of active research, and while there are too many resources to mention directly _everything_ at every level, I think a few brief points need making 
 
 1) Error propagation. 
